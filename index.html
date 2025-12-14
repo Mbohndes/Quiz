@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quiz Spesial</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- RESET & BODY --- */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            margin: 0; padding: 0;
+            background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+            height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+        }
+
+        /* --- KARTU UTAMA --- */
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            width: 90%; max-width: 380px;
+            padding: 30px 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            text-align: center;
+            position: relative;
+        }
+
+        /* --- PROGRESS BAR --- */
+        .progress { width: 100%; height: 6px; background: #eee; border-radius: 10px; margin-bottom: 25px; overflow: hidden; }
+        .bar { height: 100%; background: #ff9a9e; width: 0%; transition: width 0.3s; }
+
+        /* --- TEXT SOAL --- */
+        .question-box {
+            min-height: 90px;
+            display: flex; flex-direction: column; justify-content: center; margin-bottom: 20px;
+        }
+        h3 { color: #888; font-size: 12px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .q-text { font-size: 22px; font-weight: 700; color: #333; line-height: 1.3; }
+
+        /* --- GRID JAWABAN BIASA --- */
+        .answer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .btn-ans {
+            background: white;
+            border: 2px solid #f0f0f0;
+            border-radius: 12px;
+            padding: 15px 5px;
+            font-size: 16px; font-weight: 600; color: #555;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-ans:active { background: #eee; transform: scale(0.95); }
+
+        /* --- AREA JEBAKAN (Sejajar Kiri-Kanan) --- */
+        .trap-area {
+            display: none; /* Muncul di akhir */
+            flex-direction: row;
+            gap: 15px;
+            width: 100%;
+            height: 60px;
+            position: relative;
+        }
+
+        .btn-trap {
+            flex: 1; /* Ukuran bagi dua rata (50%) */
+            border: none;
+            border-radius: 50px;
+            font-size: 16px; font-weight: bold;
+            cursor: pointer;
+            height: 55px;
+            color: white;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .btn-yes {
+            background: linear-gradient(90deg, #ff9a9e, #fecfef);
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .btn-no {
+            background: #dcdde1;
+            color: #7f8fa6;
+            transition: top 0.2s, left 0.2s; /* Gerak halus */
+        }
+
+        /* Kelas Kabur (Lepas dari susunan) */
+        .kabur {
+            position: fixed !important; 
+            width: auto !important;
+            padding: 10px 25px !important;
+            min-width: 100px;
+            z-index: 9999;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="progress"><div class="bar" id="bar"></div></div>
+
+        <div class="question-box">
+            <h3 id="category">Quiz</h3>
+            <div class="q-text" id="question">Loading...</div>
+        </div>
+
+        <div class="answer-grid" id="normal-answers">
+            <button class="btn-ans" onclick="check(0)"></button>
+            <button class="btn-ans" onclick="check(1)"></button>
+            <button class="btn-ans" onclick="check(2)"></button>
+            <button class="btn-ans" onclick="check(3)"></button>
+        </div>
+
+        <div class="trap-area" id="trap-answers">
+            <button class="btn-trap btn-yes" onclick="kirimWA()">MAU DONG ❤️</button>
+            <button class="btn-trap btn-no" id="btn-no">GAK MAU</button>
+        </div>
+    </div>
+
+    <script>
+        // --- NOMOR WA SUDAH DIMASUKKAN ---
+        const NOMOR_WA = "6281809208710"; 
+        // ---------------------------------
+
+        const data = [
+            { 
+                cat: "Tebak Emoji",
+                q: "👻 + 🏠 = ... ?", 
+                ans: 1, 
+                opts: ["Hotel", "Rumah Hantu", "Kuburan", "Villa"] 
+            },
+            { 
+                cat: "Matematika",
+                q: "10 + 5 x 2 = ...", 
+                ans: 2, 
+                opts: ["30", "25", "20", "15"] // 5x2=10, 10+10=20
+            },
+            { 
+                cat: "Logika",
+                q: "Apa yang punya kaki tapi gak bisa jalan?", 
+                ans: 3, 
+                opts: ["Kuda", "Ayam", "Ular", "Meja"] 
+            },
+            { 
+                cat: "Last Question",
+                q: "Mau gak jadi pacar aku? 🌹", 
+                isTrap: true 
+            }
+        ];
+
+        let idx = 0;
+        const qEl = document.getElementById("question");
+        const cEl = document.getElementById("category");
+        const nBox = document.getElementById("normal-answers");
+        const tBox = document.getElementById("trap-answers");
+        const btns = document.querySelectorAll(".btn-ans");
+        const btnNo = document.getElementById("btn-no");
+        const bar = document.getElementById("bar");
+
+        function load() {
+            const item = data[idx];
+            bar.style.width = ((idx / data.length) * 100) + "%";
+            
+            cEl.innerText = item.cat;
+            qEl.innerHTML = item.q;
+
+            if(item.isTrap) {
+                // Tampilkan jebakan
+                nBox.style.display = "none";
+                tBox.style.display = "flex"; 
+            } else {
+                // Tampilkan soal biasa
+                nBox.style.display = "grid";
+                tBox.style.display = "none";
+                btns.forEach((b, i) => b.innerText = item.opts[i]);
+            }
+        }
+
+        function check(n) {
+            if(n === data[idx].ans) {
+                idx++;
+                load();
+            } else {
+                // Getar kalau salah
+                document.querySelector('.card').animate([
+                    { transform: 'translate(0px, 0px)' },
+                    { transform: 'translate(-10px, 0px)' },
+                    { transform: 'translate(10px, 0px)' },
+                    { transform: 'translate(0px, 0px)' }
+                ], { duration: 300 });
+            }
+        }
+
+        // --- FITUR KABUR ---
+        function kabur(e) {
+            if(e) e.preventDefault(); 
+
+            // Tambahkan class biar posisinya fixed (bisa terbang)
+            btnNo.classList.add("kabur");
+
+            // Area aman (dalam layar)
+            const w = window.innerWidth - 120;
+            const h = window.innerHeight - 80;
+
+            const x = Math.max(10, Math.random() * w);
+            const y = Math.max(10, Math.random() * h);
+
+            btnNo.style.left = x + "px";
+            btnNo.style.top = y + "px";
+        }
+
+        // Event HP & PC
+        btnNo.addEventListener("touchstart", kabur);
+        btnNo.addEventListener("mouseover", kabur);
+        btnNo.addEventListener("click", kabur);
+
+        function kirimWA() {
+            const pesan = "Aku Mau Bangettt Jadi Pacarmu, Mulai Ini Kita Pacaran yaaww ❤️";
+            window.location.href = `https://wa.me/${NOMOR_WA}?text=${encodeURIComponent(pesan)}`;
+        }
+
+        // Start
+        load();
+    </script>
+</body>
+</html>
